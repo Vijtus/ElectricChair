@@ -1,0 +1,1175 @@
+#include <Arduino.h>
+#include <SoftwareSerial.h>
+
+//////////////////////////////////////////////////////////////////
+// MASSAGE CHAIR UART REVERSE-ENGINEERING ANALYZER
+//
+// Goals:
+// 1) Base matrix mapping with plain-English byte changes.
+// 2) Smart limit finding for plus/minus commands.
+// 3) Auto-mode blocked/ignored button detection.
+// 4) Override / mutual-exclusion vs bitmask-combine detection.
+// 5) Streamed report output over Serial with no dynamic String use.
+//
+// Notes:
+// - Byte numbering is ZERO-BASED: Byte 0..Byte 6.
+// - Report is printed as it is discovered, so the serial log itself
+//   is the final protocol document.
+// - No heap allocations, no String objects, minimal retained state.
+//
+//////////////////////////////////////////////////////////////////
+
+// -----------------------------------------------------------------------------
+// Command definitions
+// -----------------------------------------------------------------------------
+struct CommandDef {
+  const char *name;
+  uint8_t code;
+};
+
+static const CommandDef command_map[] = {
+  { "ramiona",                  0x13 },
+  { "przedramiona",             0x12 },
+  { "nogi",                     0x11 },
+  { "sila_nacisku_plus",        0x10 },
+  { "sila_nacisku_minus",       0x0F },
+  { "masaz_posladkow",          0x0E },
+  { "masaz_stop",               0x0D },
+  { "predkosc_masazu_stop",     0x02 },
+  { "pauza",                    0x0B },
+  { "ogrzewanie",               0x03 },
+  { "czas",                     0x07 },
+  { "masaz_calego_ciala",       0x04 },
+  { "grawitacja_zero",          0x08 },
+  { "tryb_automatyczny",        0x05 },
+  { "oparcie_w_gore",           0x09 },
+  { "oparcie_w_dol",            0x06 },
+  { "predkosc_minus",           0x14 },
+  { "predkosc_plus",            0x15 },
+  { "do_przodu_do_tylu_1",      0x16 },
+  { "plecy_i_talia",            0x17 },
+  { "do_przodu_do_tylu_2",      0x18 },
+  { "szyja",                    0x19 },
+  { "power",                    0x01 }
+};
+
+static const size_t COMMAND_COUNT = sizeof(command_map) / sizeof(command_map[0]);
+
+// -----------------------------------------------------------------------------
+// Scenarios
+// -----------------------------------------------------------------------------
+struct Scenario {
+  const char *name;
+  const uint8_t *seed_seq;
+  uint8_t seed_len;
+};
+
+static const uint8_t SEED_FULL_BODY[]       = { 0x04 };
+static const uint8_t SEED_AUTO[]            = { 0x05 };
+static const uint8_t SEED_ZERO_G[]          = { 0x08 };
+static const uint8_t SEED_BACK_WAIST[]      = { 0x17 };
+static const uint8_t SEED_NECK[]            = { 0x19 };
+static const uint8_t SEED_FULL_BODY_PLUS[]  = { 0x04, 0x10 };
+static const uint8_t SEED_FULL_BODY_SPEED[] = { 0x04, 0x15 };
+
+static const Scenario scenarios[] = {
+  { "baseline",                  0,                     0 },
+  { "full_body",                 SEED_FULL_BODY,       1 },
+  { "auto",                      SEED_AUTO,            1 },
+  { "zero_gravity",              SEED_ZERO_G,          1 },
+  { "back_waist",                SEED_BACK_WAIST,      1 },
+  { "neck",                      SEED_NECK,            1 },
+  { "full_body_plus_intensity",  SEED_FULL_BODY_PLUS,  2 },
+  { "full_body_plus_speed",      SEED_FULL_BODY_SPEED, 2 }
+};
+
+static const size_t SCENARIO_COUNT = sizeof(scenarios) / sizeof(scenarios[0]);
+
+// -----------------------------------------------------------------------------
+// Scalable plus/minus analyses
+// -----------------------------------------------------------------------------
+struct ScalarProfile {
+  const char *logical_name;
+  uint8_t plus_code;
+  uint8_t minus_code;
+  const uint8_t *seed_seq;
+  uint8_t seed_len;
+};
+
+static const ScalarProfile scalar_profiles[] = {
+  { "sila_nacisku", 0x10, 0x0F, SEED_FULL_BODY, 1 },
+  { "predkosc",     0x15, 0x14, SEED_FULL_BODY, 1 }
+};
+
+static const size_t SCALAR_COUNT = sizeof(scalar_profiles) / sizeof(scalar_profiles[0]);
+
+// -----------------------------------------------------------------------------
+// Area commands for override / exclusivity checks
+// -----------------------------------------------------------------------------
+static const uint8_t AREA_COMMANDS[] = {
+  0x13, // ramiona
+  0x12, // przedramiona
+  0x11, // nogi
+  0x0E, // masaz_posladkow
+  0x04, // masaz_calego_ciala
+  0x17, // plecy_i_talia
+  0x19  // szyja
+};
+
+static const size_t AREA_COMMAND_COUNT = sizeof(AREA_COMMANDS) / sizeof(AREA_COMMANDS[0]);
+
+// -----------------------------------------------------------------------------
+// Settings
+// -----------------------------------------------------------------------------
+static const uint32_t USB_BAUD                      = 115200UL;
+static const uint32_t CHAIR_BAUD                    = 9600UL;
+static const uint32_t POLL_INTERVAL_MS              = 100UL;
+
+static const uint8_t  PRESS_REPEAT                  = 6;
+static const uint8_t  STABLE_FRAMES_REQUIRED        = 3;
+static const uint32_t STABLE_DWELL_MS               = 240UL;   // extra dwell to suppress false positives
+static const uint32_t STABLE_TIMEOUT_MS             = 3200UL;
+static const uint32_t UNCHANGED_CONFIRM_MS          = 1800UL;  // confirm ignored/dead command
+static const uint32_t STARTUP_BASELINE_TIMEOUT_MS   = 5000UL;
+static const uint32_t POWER_OFF_TIMEOUT_MS          = 5000UL;
+static const uint32_t POWER_ON_TIMEOUT_MS           = 6500UL;
+static const uint32_t INTER_COMMAND_GAP_MS          = 350UL;
+static const uint32_t INTER_SEED_GAP_MS             = 900UL;
+static const uint32_t OFF_TO_ON_GAP_MS              = 1500UL;
+static const uint8_t  MAX_SCALAR_PRESSES            = 16;
+
+static const bool INCLUDE_POWER_IN_MATRIX           = false;
+static const bool INCLUDE_MOTION_COMMANDS           = true;
+static const bool PRINT_FRAME_SNAPSHOTS             = false;
+
+static const bool RUN_BASE_MATRIX                   = true;
+static const bool RUN_SCALAR_LIMITS                 = true;
+static const bool RUN_AUTO_BLOCKED_TEST             = true;
+static const bool RUN_OVERRIDE_TESTS                = true;
+
+// -----------------------------------------------------------------------------
+// UART / parser state
+// -----------------------------------------------------------------------------
+static SoftwareSerial mySerial(10, 11); // RX, TX
+
+static uint8_t active_command = 0x00;
+static uint8_t repeat_remaining = 0;
+static uint32_t last_send_ms = 0;
+
+static uint8_t parser_buf[7];
+static uint8_t parser_idx = 0;
+
+static uint8_t stable_candidate[7];
+static bool stable_candidate_valid = false;
+static uint8_t stable_count = 0;
+static uint32_t stable_since_ms = 0;
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+static void print_hex_byte(uint8_t v) {
+  Serial.print(F("0x"));
+  if (v < 0x10) Serial.print('0');
+  Serial.print(v, HEX);
+}
+
+static void print_frame(const uint8_t *f) {
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (i) Serial.print(' ');
+    print_hex_byte(f[i]);
+  }
+}
+
+static void copy_frame(uint8_t *dst, const uint8_t *src) {
+  for (uint8_t i = 0; i < 7; ++i) dst[i] = src[i];
+}
+
+static bool frame_equals(const uint8_t *a, const uint8_t *b) {
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
+}
+
+static uint8_t diff_mask(const uint8_t *a, const uint8_t *b) {
+  uint8_t mask = 0;
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (a[i] != b[i]) mask |= (1U << i);
+  }
+  return mask;
+}
+
+static uint8_t count_changed_bytes(const uint8_t *a, const uint8_t *b) {
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (a[i] != b[i]) n++;
+  }
+  return n;
+}
+
+static int8_t first_changed_byte(const uint8_t *a, const uint8_t *b) {
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (a[i] != b[i]) return (int8_t)i;
+  }
+  return -1;
+}
+
+static bool frame_equals_mask(const uint8_t *a, const uint8_t *b, uint8_t mask) {
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (mask & (1U << i)) {
+      if (a[i] != b[i]) return false;
+    }
+  }
+  return true;
+}
+
+static bool frame_matches_or_mask(const uint8_t *ab, const uint8_t *a, const uint8_t *b, uint8_t mask) {
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (mask & (1U << i)) {
+      if (ab[i] != (uint8_t)(a[i] | b[i])) return false;
+    }
+  }
+  return true;
+}
+
+static void print_byte_label(uint8_t idx) {
+  Serial.print(F("Byte "));
+  Serial.print(idx);
+}
+
+static void print_changed_targets(const uint8_t *before, const uint8_t *after) {
+  bool first = true;
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (before[i] != after[i]) {
+      if (!first) Serial.print(F(", "));
+      print_byte_label(i);
+      Serial.print('=');
+      print_hex_byte(after[i]);
+      first = false;
+    }
+  }
+  if (first) Serial.print(F("none"));
+}
+
+static void print_masked_byte_list(uint8_t mask) {
+  bool first = true;
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (mask & (1U << i)) {
+      if (!first) Serial.print(F(", "));
+      print_byte_label(i);
+      first = false;
+    }
+  }
+  if (first) Serial.print(F("none"));
+}
+
+static const char *command_name(uint8_t code) {
+  for (size_t i = 0; i < COMMAND_COUNT; ++i) {
+    if (command_map[i].code == code) return command_map[i].name;
+  }
+  return "unknown";
+}
+
+static int8_t command_index_by_code(uint8_t code) {
+  for (size_t i = 0; i < COMMAND_COUNT; ++i) {
+    if (command_map[i].code == code) return (int8_t)i;
+  }
+  return -1;
+}
+
+static bool is_motion_command(uint8_t code) {
+  return (code == 0x06 || code == 0x09 || code == 0x16 || code == 0x18);
+}
+
+static bool should_test_command(uint8_t code) {
+  if (!INCLUDE_POWER_IN_MATRIX && code == 0x01) return false;
+  if (!INCLUDE_MOTION_COMMANDS && is_motion_command(code)) return false;
+  return true;
+}
+
+static bool should_test_in_auto_block_mode(uint8_t code) {
+  if (!should_test_command(code)) return false;
+  if (code == 0x01) return false; // power would destroy the test state
+  if (code == 0x05) return false; // auto vs auto is not useful
+  return true;
+}
+
+static bool is_off_like_frame(const uint8_t *f) {
+  return (f[0] == 0xAA &&
+          f[1] == 0x55 &&
+          f[2] == 0x08 &&
+          f[3] == 0x00 &&
+          f[4] == 0x00 &&
+          f[5] == 0x00 &&
+          f[6] == 0x00);
+}
+
+static bool is_on_like_frame(const uint8_t *f) {
+  return !is_off_like_frame(f);
+}
+
+// -----------------------------------------------------------------------------
+// Report formatting helpers
+// -----------------------------------------------------------------------------
+static void print_major_divider() {
+  Serial.println(F("======================================================================"));
+}
+
+static void print_minor_divider() {
+  Serial.println(F("----------------------------------------------------------------------"));
+}
+
+static void print_report_header() {
+  Serial.println();
+  print_major_divider();
+  Serial.println(F("FINAL PROTOCOL DOCUMENTATION - MASSAGE CHAIR UART"));
+  print_major_divider();
+  Serial.println(F("[NOTE] Byte numbering is zero-based: Byte 0..Byte 6."));
+  Serial.println(F("[NOTE] Report is generated live by the Arduino itself."));
+  Serial.println(F("[NOTE] No dynamic String buffering is used; findings are streamed as confirmed."));
+  Serial.println();
+}
+
+static void print_report_footer() {
+  Serial.println();
+  print_major_divider();
+  Serial.println(F("END OF FINAL PROTOCOL DOCUMENTATION"));
+  print_major_divider();
+  Serial.println(F("ALL_DONE"));
+}
+
+static void print_section_title(const __FlashStringHelper *title) {
+  Serial.println();
+  print_major_divider();
+  Serial.println(title);
+  print_major_divider();
+}
+
+static void print_scenario_title(const char *name) {
+  Serial.println();
+  print_minor_divider();
+  Serial.print(F("[SCENARIO] "));
+  Serial.println(name);
+  print_minor_divider();
+}
+
+static void print_warning_prefix() {
+  Serial.print(F("[WARN] "));
+}
+
+// -----------------------------------------------------------------------------
+// Parser / stability
+// -----------------------------------------------------------------------------
+static void reset_stability() {
+  stable_candidate_valid = false;
+  stable_count = 0;
+  stable_since_ms = 0;
+}
+
+static bool feed_parser(uint8_t b, uint8_t *out_frame) {
+  if (parser_idx == 0) {
+    if (b == 0xAA) {
+      parser_buf[parser_idx++] = b;
+    }
+    return false;
+  }
+
+  if (parser_idx == 1) {
+    if (b == 0x55) {
+      parser_buf[parser_idx++] = b;
+    } else if (b == 0xAA) {
+      parser_buf[0] = 0xAA;
+      parser_idx = 1;
+    } else {
+      parser_idx = 0;
+    }
+    return false;
+  }
+
+  if (b == 0xAA) {
+    parser_buf[0] = 0xAA;
+    parser_idx = 1;
+    return false;
+  }
+
+  parser_buf[parser_idx++] = b;
+
+  if (parser_idx == 7) {
+    for (uint8_t i = 0; i < 7; ++i) out_frame[i] = parser_buf[i];
+    parser_idx = 0;
+    return true;
+  }
+
+  return false;
+}
+
+static void on_frame_parsed(const uint8_t *frame) {
+  if (!stable_candidate_valid) {
+    copy_frame(stable_candidate, frame);
+    stable_candidate_valid = true;
+    stable_count = 1;
+    stable_since_ms = millis();
+    return;
+  }
+
+  if (frame_equals(stable_candidate, frame)) {
+    if (stable_count < 255) stable_count++;
+  } else {
+    copy_frame(stable_candidate, frame);
+    stable_count = 1;
+    stable_since_ms = millis();
+  }
+}
+
+static bool stable_candidate_ready() {
+  if (!stable_candidate_valid) return false;
+  if (stable_count < STABLE_FRAMES_REQUIRED) return false;
+  if ((millis() - stable_since_ms) < STABLE_DWELL_MS) return false;
+  return true;
+}
+
+// -----------------------------------------------------------------------------
+// IO service
+// -----------------------------------------------------------------------------
+static void read_chair_data() {
+  uint8_t frame[7];
+  while (mySerial.available() > 0) {
+    const uint8_t b = (uint8_t)mySerial.read();
+    if (feed_parser(b, frame)) {
+      on_frame_parsed(frame);
+    }
+  }
+}
+
+static void send_periodic() {
+  const uint32_t now = millis();
+  if ((now - last_send_ms) < POLL_INTERVAL_MS) return;
+  last_send_ms = now;
+
+  uint8_t out = 0x00;
+  if (repeat_remaining > 0) {
+    out = active_command;
+    repeat_remaining--;
+  }
+  mySerial.write(out);
+}
+
+static void service_io() {
+  read_chair_data();
+  send_periodic();
+}
+
+static void quiet_gap(uint32_t ms) {
+  const uint32_t start = millis();
+  while ((millis() - start) < ms) {
+    service_io();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Command actions
+// -----------------------------------------------------------------------------
+static void press_command(uint8_t code, uint8_t repeats) {
+  active_command = code;
+  repeat_remaining = repeats;
+}
+
+static bool wait_for_stable_frame(uint8_t *out_frame, uint32_t timeout_ms) {
+  reset_stability();
+  const uint32_t start = millis();
+
+  while ((millis() - start) < timeout_ms) {
+    service_io();
+    if (stable_candidate_ready()) {
+      copy_frame(out_frame, stable_candidate);
+      return true;
+    }
+  }
+
+  if (stable_candidate_valid) copy_frame(out_frame, stable_candidate);
+  return false;
+}
+
+// Wait for a command result while being robust against false positives.
+// If the stable result equals "before", it is only accepted after an
+// unchanged confirmation window, so ignored/dead buttons are detected
+// without immediately returning too early.
+static bool send_command_and_wait_result(uint8_t code,
+                                         const uint8_t *before,
+                                         uint8_t *out_after,
+                                         uint32_t timeout_ms) {
+  press_command(code, PRESS_REPEAT);
+  reset_stability();
+
+  const uint32_t start = millis();
+  bool repeats_done = false;
+  uint32_t repeats_done_ms = 0;
+  bool saw_different_frame = false;
+
+  while ((millis() - start) < timeout_ms) {
+    service_io();
+
+    if (!repeats_done && repeat_remaining == 0) {
+      repeats_done = true;
+      repeats_done_ms = millis();
+    }
+
+    if (!repeats_done) continue;
+
+    if (stable_candidate_valid && !frame_equals(stable_candidate, before)) {
+      saw_different_frame = true;
+    }
+
+    if (stable_candidate_ready()) {
+      if (!frame_equals(stable_candidate, before)) {
+        copy_frame(out_after, stable_candidate);
+        return true;
+      }
+
+      if (!saw_different_frame &&
+          (millis() - repeats_done_ms) >= UNCHANGED_CONFIRM_MS) {
+        copy_frame(out_after, stable_candidate);
+        return true;
+      }
+    }
+  }
+
+  if (stable_candidate_valid) copy_frame(out_after, stable_candidate);
+  else copy_frame(out_after, before);
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// Reset / known-state helpers
+// -----------------------------------------------------------------------------
+static bool force_clean_on_state(uint8_t *out_frame) {
+  uint8_t cur[7];
+  const bool have_cur = wait_for_stable_frame(cur, STARTUP_BASELINE_TIMEOUT_MS);
+
+  if (have_cur && is_on_like_frame(cur)) {
+    uint8_t off_frame[7];
+    if (!send_command_and_wait_result(0x01, cur, off_frame, POWER_OFF_TIMEOUT_MS)) {
+      print_warning_prefix();
+      Serial.println(F("Power-off stabilization failed during clean reset."));
+    }
+    quiet_gap(OFF_TO_ON_GAP_MS);
+  } else {
+    quiet_gap(OFF_TO_ON_GAP_MS);
+  }
+
+  uint8_t presumed_before[7];
+  if (have_cur) copy_frame(presumed_before, cur);
+  else {
+    for (uint8_t i = 0; i < 7; ++i) presumed_before[i] = 0x00;
+  }
+
+  uint8_t on_frame[7];
+  const bool got_on = send_command_and_wait_result(0x01, presumed_before, on_frame, POWER_ON_TIMEOUT_MS);
+
+  if (!got_on) {
+    print_warning_prefix();
+    Serial.println(F("Power-on stabilization failed during clean reset."));
+    return false;
+  }
+
+  copy_frame(out_frame, on_frame);
+  quiet_gap(INTER_COMMAND_GAP_MS);
+  return true;
+}
+
+static bool apply_seed_sequence(const uint8_t *seed_seq, uint8_t seed_len, uint8_t *seeded_frame) {
+  if (seed_len == 0 || seed_seq == 0) {
+    return wait_for_stable_frame(seeded_frame, STABLE_TIMEOUT_MS);
+  }
+
+  uint8_t cur[7];
+  if (!wait_for_stable_frame(cur, STABLE_TIMEOUT_MS)) {
+    print_warning_prefix();
+    Serial.println(F("Could not capture stable frame before seed sequence."));
+    return false;
+  }
+
+  for (uint8_t i = 0; i < seed_len; ++i) {
+    uint8_t next[7];
+    const uint8_t code = seed_seq[i];
+
+    const bool got = send_command_and_wait_result(code, cur, next, STABLE_TIMEOUT_MS);
+    if (!got) {
+      print_warning_prefix();
+      Serial.print(F("Seed step failed for command \""));
+      Serial.print(command_name(code));
+      Serial.println(F("\"."));
+      return false;
+    }
+
+    copy_frame(cur, next);
+    quiet_gap(INTER_SEED_GAP_MS);
+  }
+
+  copy_frame(seeded_frame, cur);
+  return true;
+}
+
+static bool apply_seed_sequence(const Scenario &sc, uint8_t *seeded_frame) {
+  return apply_seed_sequence(sc.seed_seq, sc.seed_len, seeded_frame);
+}
+
+// -----------------------------------------------------------------------------
+// Plain-English delta reporting
+// -----------------------------------------------------------------------------
+static void print_change_sentence(const char *scenario_name,
+                                  const char *cmd_name,
+                                  uint8_t cmd_code,
+                                  uint8_t byte_index,
+                                  uint8_t before_val,
+                                  uint8_t after_val) {
+  Serial.print(F("[ACTION] Scenario \""));
+  Serial.print(scenario_name);
+  Serial.print(F("\", Command \""));
+  Serial.print(cmd_name);
+  Serial.print(F("\" ("));
+  print_hex_byte(cmd_code);
+  Serial.print(F(") "));
+
+  if (before_val == 0x00 && after_val != 0x00) {
+    Serial.print(F("activates "));
+    print_byte_label(byte_index);
+    Serial.print(F(" to value "));
+    print_hex_byte(after_val);
+    Serial.println('.');
+    return;
+  }
+
+  if (before_val != 0x00 && after_val == 0x00) {
+    Serial.print(F("clears "));
+    print_byte_label(byte_index);
+    Serial.print(F(" from "));
+    print_hex_byte(before_val);
+    Serial.println(F(" to 0x00."));
+    return;
+  }
+
+  if ((uint8_t)(before_val + 1) == after_val) {
+    Serial.print(F("increments "));
+    print_byte_label(byte_index);
+    Serial.print(F(" from "));
+    print_hex_byte(before_val);
+    Serial.print(F(" to "));
+    print_hex_byte(after_val);
+    Serial.println('.');
+    return;
+  }
+
+  if ((uint8_t)(after_val + 1) == before_val) {
+    Serial.print(F("decrements "));
+    print_byte_label(byte_index);
+    Serial.print(F(" from "));
+    print_hex_byte(before_val);
+    Serial.print(F(" to "));
+    print_hex_byte(after_val);
+    Serial.println('.');
+    return;
+  }
+
+  Serial.print(F("changes "));
+  print_byte_label(byte_index);
+  Serial.print(F(" from "));
+  print_hex_byte(before_val);
+  Serial.print(F(" to "));
+  print_hex_byte(after_val);
+  Serial.println('.');
+}
+
+static void report_matrix_result(const char *scenario_name,
+                                 const CommandDef &cmd,
+                                 bool got_before,
+                                 bool got_after,
+                                 const uint8_t *before,
+                                 const uint8_t *after) {
+  if (!got_before || !got_after) {
+    print_warning_prefix();
+    Serial.print(F("Scenario \""));
+    Serial.print(scenario_name);
+    Serial.print(F("\", Command \""));
+    Serial.print(cmd.name);
+    Serial.println(F("\" did not reach a reliable stable state."));
+    return;
+  }
+
+  if (frame_equals(before, after)) {
+    Serial.print(F("[NO_EFFECT] Scenario \""));
+    Serial.print(scenario_name);
+    Serial.print(F("\", Command \""));
+    Serial.print(cmd.name);
+    Serial.print(F("\" ("));
+    print_hex_byte(cmd.code);
+    Serial.println(F(") produced no stable frame change."));
+    return;
+  }
+
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (before[i] != after[i]) {
+      print_change_sentence(scenario_name, cmd.name, cmd.code, i, before[i], after[i]);
+    }
+  }
+
+  if (PRINT_FRAME_SNAPSHOTS) {
+    Serial.print(F("[FRAME] before="));
+    print_frame(before);
+    Serial.print(F(" | after="));
+    print_frame(after);
+    Serial.println();
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Section 1: Base matrix mapping
+// -----------------------------------------------------------------------------
+static void run_base_matrix() {
+  print_section_title(F("SECTION 1 - BASE MATRIX MAPPING"));
+
+  for (size_t s = 0; s < SCENARIO_COUNT; ++s) {
+    const Scenario &sc = scenarios[s];
+    print_scenario_title(sc.name);
+
+    for (size_t c = 0; c < COMMAND_COUNT; ++c) {
+      const CommandDef &cmd = command_map[c];
+      if (!should_test_command(cmd.code)) continue;
+
+      uint8_t clean_on[7];
+      if (!force_clean_on_state(clean_on)) {
+        print_warning_prefix();
+        Serial.print(F("Skipping scenario \""));
+        Serial.print(sc.name);
+        Serial.print(F("\", command \""));
+        Serial.print(cmd.name);
+        Serial.println(F("\" because clean reset failed."));
+        continue;
+      }
+
+      uint8_t before[7];
+      const bool got_before = apply_seed_sequence(sc, before);
+
+      uint8_t after[7];
+      bool got_after = false;
+
+      if (got_before) {
+        got_after = send_command_and_wait_result(cmd.code, before, after, STABLE_TIMEOUT_MS);
+      }
+
+      report_matrix_result(sc.name, cmd, got_before, got_after, before, after);
+      quiet_gap(INTER_COMMAND_GAP_MS);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Section 2: Scalar limit / step discovery
+// -----------------------------------------------------------------------------
+static void report_scalar_step(const char *logical_name,
+                               const char *step_cmd_name,
+                               const uint8_t *before,
+                               const uint8_t *after) {
+  for (uint8_t i = 0; i < 7; ++i) {
+    if (before[i] != after[i]) {
+      Serial.print(F("[STEP] \""));
+      Serial.print(logical_name);
+      Serial.print(F("\" via \""));
+      Serial.print(step_cmd_name);
+      Serial.print(F("\" "));
+      if ((uint8_t)(before[i] + 1) == after[i]) {
+        Serial.print(F("increments "));
+      } else if ((uint8_t)(after[i] + 1) == before[i]) {
+        Serial.print(F("decrements "));
+      } else if (before[i] == 0x00 && after[i] != 0x00) {
+        Serial.print(F("activates "));
+      } else if (before[i] != 0x00 && after[i] == 0x00) {
+        Serial.print(F("clears "));
+      } else {
+        Serial.print(F("changes "));
+      }
+
+      print_byte_label(i);
+      Serial.print(F(" from "));
+      print_hex_byte(before[i]);
+      Serial.print(F(" to "));
+      print_hex_byte(after[i]);
+      Serial.println('.');
+    }
+  }
+}
+
+static void run_scalar_limits() {
+  print_section_title(F("SECTION 2 - LIMIT & STEP FINDING"));
+
+  for (size_t p = 0; p < SCALAR_COUNT; ++p) {
+    const ScalarProfile &prof = scalar_profiles[p];
+    print_minor_divider();
+    Serial.print(F("[SCALAR] Analyzing \""));
+    Serial.print(prof.logical_name);
+    Serial.println(F("\"."));
+    print_minor_divider();
+
+    uint8_t clean_on[7];
+    if (!force_clean_on_state(clean_on)) {
+      print_warning_prefix();
+      Serial.print(F("Skipping scalar analysis for \""));
+      Serial.print(prof.logical_name);
+      Serial.println(F("\" because clean reset failed."));
+      continue;
+    }
+
+    uint8_t current[7];
+    if (!apply_seed_sequence(prof.seed_seq, prof.seed_len, current)) {
+      print_warning_prefix();
+      Serial.print(F("Skipping scalar analysis for \""));
+      Serial.print(prof.logical_name);
+      Serial.println(F("\" because seed activation failed."));
+      continue;
+    }
+
+    int8_t primary_byte = -1;
+    bool ambiguous = false;
+
+    uint8_t max_frame[7];
+    copy_frame(max_frame, current);
+
+    // Walk up
+    for (uint8_t step = 0; step < MAX_SCALAR_PRESSES; ++step) {
+      uint8_t next[7];
+      const bool got = send_command_and_wait_result(prof.plus_code, current, next, STABLE_TIMEOUT_MS);
+      if (!got) {
+        print_warning_prefix();
+        Serial.print(F("Plus stepping timed out for \""));
+        Serial.print(prof.logical_name);
+        Serial.println(F("\"."));
+        break;
+      }
+
+      if (frame_equals(current, next)) {
+        break; // reached ceiling
+      }
+
+      report_scalar_step(prof.logical_name, command_name(prof.plus_code), current, next);
+
+      const uint8_t changed = count_changed_bytes(current, next);
+      if (changed == 1) {
+        const int8_t idx = first_changed_byte(current, next);
+        if (primary_byte < 0) primary_byte = idx;
+        else if (primary_byte != idx) ambiguous = true;
+      } else {
+        ambiguous = true;
+      }
+
+      copy_frame(current, next);
+      copy_frame(max_frame, next);
+      quiet_gap(INTER_COMMAND_GAP_MS);
+    }
+
+    // Walk down
+    uint8_t min_frame[7];
+    copy_frame(min_frame, current);
+
+    for (uint8_t step = 0; step < MAX_SCALAR_PRESSES; ++step) {
+      uint8_t next[7];
+      const bool got = send_command_and_wait_result(prof.minus_code, current, next, STABLE_TIMEOUT_MS);
+      if (!got) {
+        print_warning_prefix();
+        Serial.print(F("Minus stepping timed out for \""));
+        Serial.print(prof.logical_name);
+        Serial.println(F("\"."));
+        break;
+      }
+
+      if (frame_equals(current, next)) {
+        break; // reached floor
+      }
+
+      report_scalar_step(prof.logical_name, command_name(prof.minus_code), current, next);
+
+      const uint8_t changed = count_changed_bytes(current, next);
+      if (changed == 1) {
+        const int8_t idx = first_changed_byte(current, next);
+        if (primary_byte < 0) primary_byte = idx;
+        else if (primary_byte != idx) ambiguous = true;
+      } else {
+        ambiguous = true;
+      }
+
+      copy_frame(current, next);
+      copy_frame(min_frame, next);
+      quiet_gap(INTER_COMMAND_GAP_MS);
+    }
+
+    if (primary_byte >= 0 && !ambiguous) {
+      Serial.print(F("[LIMITS] \""));
+      Serial.print(prof.logical_name);
+      Serial.print(F("\" modifies "));
+      print_byte_label((uint8_t)primary_byte);
+      Serial.print(F(". Min val: "));
+      print_hex_byte(min_frame[(uint8_t)primary_byte]);
+      Serial.print(F(", Max val: "));
+      print_hex_byte(max_frame[(uint8_t)primary_byte]);
+      Serial.println('.');
+    } else if (primary_byte >= 0 && ambiguous) {
+      Serial.print(F("[LIMITS] \""));
+      Serial.print(prof.logical_name);
+      Serial.print(F("\" has a dominant "));
+      print_byte_label((uint8_t)primary_byte);
+      Serial.println(F(", but some steps also changed additional bytes. Clean single-byte bounds were not guaranteed."));
+    } else {
+      Serial.print(F("[LIMITS] \""));
+      Serial.print(prof.logical_name);
+      Serial.println(F("\" did not resolve to a clean byte mapping."));
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Section 3: Blocked / ignored commands in auto mode
+// -----------------------------------------------------------------------------
+static void print_command_list_from_bitmask(uint32_t mask) {
+  bool first = true;
+  for (size_t i = 0; i < COMMAND_COUNT; ++i) {
+    if (mask & (1UL << i)) {
+      if (!first) Serial.print(F(", "));
+      Serial.print(command_map[i].name);
+      first = false;
+    }
+  }
+  if (first) Serial.print(F("none"));
+}
+
+static void run_auto_blocked_test() {
+  print_section_title(F("SECTION 3 - FEATURE BLOCKING / DEAD BUTTONS IN AUTO MODE"));
+
+  uint32_t blocked_mask = 0;
+
+  uint8_t clean_on_ref[7];
+  uint8_t auto_frame_ref[7];
+  bool have_auto_signature = false;
+
+  if (force_clean_on_state(clean_on_ref) &&
+      apply_seed_sequence(SEED_AUTO, 1, auto_frame_ref)) {
+    have_auto_signature = true;
+  }
+
+  for (size_t c = 0; c < COMMAND_COUNT; ++c) {
+    const CommandDef &cmd = command_map[c];
+    if (!should_test_in_auto_block_mode(cmd.code)) continue;
+
+    uint8_t clean_on[7];
+    if (!force_clean_on_state(clean_on)) {
+      print_warning_prefix();
+      Serial.print(F("Auto-block test skipped for \""));
+      Serial.print(cmd.name);
+      Serial.println(F("\" because clean reset failed."));
+      continue;
+    }
+
+    uint8_t auto_frame[7];
+    if (!apply_seed_sequence(SEED_AUTO, 1, auto_frame)) {
+      print_warning_prefix();
+      Serial.print(F("Auto-block test skipped for \""));
+      Serial.print(cmd.name);
+      Serial.println(F("\" because auto activation failed."));
+      continue;
+    }
+
+    uint8_t after[7];
+    const bool got_after = send_command_and_wait_result(cmd.code, auto_frame, after, STABLE_TIMEOUT_MS);
+    if (!got_after) {
+      print_warning_prefix();
+      Serial.print(F("Auto-block test did not stabilize for \""));
+      Serial.print(cmd.name);
+      Serial.println(F("\"."));
+      continue;
+    }
+
+    if (frame_equals(auto_frame, after)) {
+      const int8_t idx = command_index_by_code(cmd.code);
+      if (idx >= 0) blocked_mask |= (1UL << idx);
+
+      Serial.print(F("[AUTO_TEST] \""));
+      Serial.print(cmd.name);
+      Serial.println(F("\" is ignored while auto mode is active."));
+    } else {
+      Serial.print(F("[AUTO_TEST] \""));
+      Serial.print(cmd.name);
+      Serial.println(F("\" still changes the frame while auto mode is active."));
+    }
+
+    quiet_gap(INTER_COMMAND_GAP_MS);
+  }
+
+  Serial.print(F("[BLOCKED] When \"tryb_automatyczny\" is active ("));
+  if (have_auto_signature) {
+    print_changed_targets(clean_on_ref, auto_frame_ref);
+  } else {
+    Serial.print(F("auto signature unavailable"));
+  }
+  Serial.print(F("), the following buttons are DEAD / ignored: "));
+  print_command_list_from_bitmask(blocked_mask);
+  Serial.println('.');
+}
+
+// -----------------------------------------------------------------------------
+// Section 4: Override / exclusivity / bitmask behavior
+// -----------------------------------------------------------------------------
+static bool capture_single_command_from_clean(uint8_t code,
+                                              uint8_t *out_clean,
+                                              uint8_t *out_after) {
+  if (!force_clean_on_state(out_clean)) return false;
+  return send_command_and_wait_result(code, out_clean, out_after, STABLE_TIMEOUT_MS);
+}
+
+static void analyze_override_pair(uint8_t first_code, uint8_t second_code) {
+  uint8_t clean_a[7], after_a[7];
+  uint8_t clean_b[7], after_b[7];
+  uint8_t clean_ab[7], after_ab_first[7], after_ab[7];
+
+  if (!capture_single_command_from_clean(first_code, clean_a, after_a)) {
+    print_warning_prefix();
+    Serial.print(F("Could not capture clean frame for \""));
+    Serial.print(command_name(first_code));
+    Serial.println(F("\"."));
+    return;
+  }
+
+  if (!capture_single_command_from_clean(second_code, clean_b, after_b)) {
+    print_warning_prefix();
+    Serial.print(F("Could not capture clean frame for \""));
+    Serial.print(command_name(second_code));
+    Serial.println(F("\"."));
+    return;
+  }
+
+  if (!force_clean_on_state(clean_ab)) {
+    print_warning_prefix();
+    Serial.println(F("Could not begin pairwise override analysis because clean reset failed."));
+    return;
+  }
+
+  if (!send_command_and_wait_result(first_code, clean_ab, after_ab_first, STABLE_TIMEOUT_MS)) {
+    print_warning_prefix();
+    Serial.print(F("Could not stabilize first command \""));
+    Serial.print(command_name(first_code));
+    Serial.println(F("\" in pairwise analysis."));
+    return;
+  }
+
+  if (!send_command_and_wait_result(second_code, after_ab_first, after_ab, STABLE_TIMEOUT_MS)) {
+    print_warning_prefix();
+    Serial.print(F("Could not stabilize second command \""));
+    Serial.print(command_name(second_code));
+    Serial.println(F("\" in pairwise analysis."));
+    return;
+  }
+
+  const uint8_t mask_a = diff_mask(clean_a, after_a);
+  const uint8_t mask_b = diff_mask(clean_b, after_b);
+  const uint8_t relevant_mask = (uint8_t)(mask_a | mask_b);
+
+  if (relevant_mask == 0) {
+    Serial.print(F("[INTERACTION] \""));
+    Serial.print(command_name(first_code));
+    Serial.print(F("\" and \""));
+    Serial.print(command_name(second_code));
+    Serial.println(F("\" did not produce identifiable relevant bytes from clean state."));
+    return;
+  }
+
+  const bool looks_like_override =
+      frame_equals_mask(after_ab, after_b, relevant_mask) &&
+      !frame_equals_mask(after_ab, after_a, relevant_mask);
+
+  const bool looks_like_bitmask =
+      frame_matches_or_mask(after_ab, after_a, after_b, relevant_mask) &&
+      !looks_like_override;
+
+  if (looks_like_override) {
+    Serial.print(F("[OVERRIDE] After \""));
+    Serial.print(command_name(first_code));
+    Serial.print(F("\", pressing \""));
+    Serial.print(command_name(second_code));
+    Serial.print(F("\" produces the same relevant bytes as clean \""));
+    Serial.print(command_name(second_code));
+    Serial.print(F("\". This suggests mutual exclusivity / overwrite behavior on "));
+    print_masked_byte_list(relevant_mask);
+    Serial.println('.');
+    return;
+  }
+
+  if (looks_like_bitmask) {
+    Serial.print(F("[BITMASK] \""));
+    Serial.print(command_name(first_code));
+    Serial.print(F("\" followed by \""));
+    Serial.print(command_name(second_code));
+    Serial.print(F("\" appears to combine states by OR-style accumulation on "));
+    print_masked_byte_list(relevant_mask);
+    Serial.println('.');
+    return;
+  }
+
+  Serial.print(F("[INTERACTION] \""));
+  Serial.print(command_name(first_code));
+  Serial.print(F("\" followed by \""));
+  Serial.print(command_name(second_code));
+  Serial.print(F("\" produced a mixed state that is neither a pure override nor a simple OR-bitmask on "));
+  print_masked_byte_list(relevant_mask);
+  Serial.println('.');
+}
+
+static void run_override_tests() {
+  print_section_title(F("SECTION 4 - OVERRIDES, EXCLUSIVITY, AND BITMASK CHECKS"));
+
+  for (size_t i = 0; i < AREA_COMMAND_COUNT; ++i) {
+    for (size_t j = 0; j < AREA_COMMAND_COUNT; ++j) {
+      if (i == j) continue;
+      analyze_override_pair(AREA_COMMANDS[i], AREA_COMMANDS[j]);
+      quiet_gap(INTER_COMMAND_GAP_MS);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Arduino entry points
+// -----------------------------------------------------------------------------
+void setup() {
+  Serial.begin(USB_BAUD);
+  mySerial.begin(CHAIR_BAUD);
+  delay(1500);
+
+  print_report_header();
+
+  Serial.print(F("[INFO] USB baud: "));
+  Serial.println(USB_BAUD);
+  Serial.print(F("[INFO] Chair baud: "));
+  Serial.println(CHAIR_BAUD);
+  Serial.print(F("[INFO] Poll interval ms: "));
+  Serial.println(POLL_INTERVAL_MS);
+  Serial.print(F("[INFO] Press repeat count: "));
+  Serial.println(PRESS_REPEAT);
+  Serial.print(F("[INFO] Stable frames required: "));
+  Serial.println(STABLE_FRAMES_REQUIRED);
+  Serial.print(F("[INFO] Stable dwell ms: "));
+  Serial.println(STABLE_DWELL_MS);
+  Serial.println();
+}
+
+void loop() {
+  static bool has_run = false;
+
+  if (!has_run) {
+    has_run = true;
+
+    if (RUN_BASE_MATRIX)      run_base_matrix();
+    if (RUN_SCALAR_LIMITS)    run_scalar_limits();
+    if (RUN_AUTO_BLOCKED_TEST) run_auto_blocked_test();
+    if (RUN_OVERRIDE_TESTS)   run_override_tests();
+
+    print_report_footer();
+  }
+
+  service_io();
+}

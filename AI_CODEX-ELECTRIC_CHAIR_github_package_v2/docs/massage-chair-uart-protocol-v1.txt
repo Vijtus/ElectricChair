@@ -1,0 +1,472 @@
+======================================================================
+FINAL PROTOCOL DOCUMENTATION - MASSAGE CHAIR UART
+======================================================================
+[NOTE] Byte numbering is zero-based: Byte 0..Byte 6.
+[NOTE] Report is generated live by the Arduino itself.
+[NOTE] No dynamic String buffering is used; findings are streamed as confirmed.
+
+[INFO] USB baud: 115200
+[INFO] Chair baud: 9600
+[INFO] Poll interval ms: 100
+[INFO] Press repeat count: 6
+[INFO] Stable frames required: 3
+[INFO] Stable dwell ms: 240
+
+
+======================================================================
+SECTION 1 - BASE MATRIX MAPPING
+======================================================================
+
+----------------------------------------------------------------------
+[SCENARIO] baseline
+----------------------------------------------------------------------
+[ACTION] Scenario "baseline", Command "ramiona" (0x13) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "ramiona" (0x13) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "ramiona" (0x13) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "ramiona" (0x13) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "przedramiona" (0x12) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "przedramiona" (0x12) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "przedramiona" (0x12) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "przedramiona" (0x12) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "nogi" (0x11) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "nogi" (0x11) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "nogi" (0x11) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "nogi" (0x11) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "sila_nacisku_plus" (0x10) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "sila_nacisku_plus" (0x10) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "sila_nacisku_plus" (0x10) activates Byte 5 to value 0x0F.
+[ACTION] Scenario "baseline", Command "sila_nacisku_plus" (0x10) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "sila_nacisku_minus" (0x0F) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "sila_nacisku_minus" (0x0F) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "sila_nacisku_minus" (0x0F) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "masaz_posladkow" (0x0E) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "masaz_posladkow" (0x0E) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "masaz_posladkow" (0x0E) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "masaz_posladkow" (0x0E) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "masaz_stop" (0x0D) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "masaz_stop" (0x0D) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "masaz_stop" (0x0D) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "masaz_stop" (0x0D) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "predkosc_masazu_stop" (0x02) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "predkosc_masazu_stop" (0x02) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "predkosc_masazu_stop" (0x02) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "predkosc_masazu_stop" (0x02) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "pauza" (0x0B) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "pauza" (0x0B) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "pauza" (0x0B) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "pauza" (0x0B) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "ogrzewanie" (0x03) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "ogrzewanie" (0x03) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "ogrzewanie" (0x03) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "ogrzewanie" (0x03) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "czas" (0x07) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "czas" (0x07) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "czas" (0x07) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "czas" (0x07) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "masaz_calego_ciala" (0x04) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "masaz_calego_ciala" (0x04) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "grawitacja_zero" (0x08) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "grawitacja_zero" (0x08) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "grawitacja_zero" (0x08) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "grawitacja_zero" (0x08) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "tryb_automatyczny" (0x05) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "tryb_automatyczny" (0x05) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "tryb_automatyczny" (0x05) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "tryb_automatyczny" (0x05) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "oparcie_w_gore" (0x09) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "oparcie_w_gore" (0x09) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "oparcie_w_gore" (0x09) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "oparcie_w_gore" (0x09) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "oparcie_w_dol" (0x06) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "oparcie_w_dol" (0x06) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "oparcie_w_dol" (0x06) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "oparcie_w_dol" (0x06) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "predkosc_minus" (0x14) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "predkosc_minus" (0x14) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "predkosc_minus" (0x14) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "predkosc_minus" (0x14) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "predkosc_plus" (0x15) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "predkosc_plus" (0x15) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "predkosc_plus" (0x15) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "predkosc_plus" (0x15) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_1" (0x16) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_1" (0x16) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_1" (0x16) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_1" (0x16) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "plecy_i_talia" (0x17) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "plecy_i_talia" (0x17) activates Byte 4 to value 0x0C.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_2" (0x18) activates Byte 3 to value 0x04.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_2" (0x18) activates Byte 4 to value 0x02.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_2" (0x18) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "baseline", Command "do_przodu_do_tylu_2" (0x18) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "baseline", Command "szyja" (0x19) activates Byte 4 to value 0x0E.
+
+----------------------------------------------------------------------
+[SCENARIO] full_body
+----------------------------------------------------------------------
+[ACTION] Scenario "full_body", Command "ramiona" (0x13) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body", Command "ramiona" (0x13) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "full_body", Command "przedramiona" (0x12) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body", Command "przedramiona" (0x12) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "full_body", Command "nogi" (0x11) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body", Command "nogi" (0x11) activates Byte 6 to value 0x0F.
+[WARN] Scenario "full_body", Command "sila_nacisku_plus" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "sila_nacisku_minus" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "masaz_posladkow" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "masaz_stop" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "predkosc_masazu_stop" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "pauza" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "czas" did not reach a reliable stable state.
+[ACTION] Scenario "full_body", Command "masaz_calego_ciala" (0x04) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body", Command "masaz_calego_ciala" (0x04) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "full_body", Command "grawitacja_zero" (0x08) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "full_body", Command "grawitacja_zero" (0x08) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "full_body", Command "tryb_automatyczny" (0x05) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body", Command "tryb_automatyczny" (0x05) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "full_body", Command "oparcie_w_gore" (0x09) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "full_body", Command "oparcie_w_gore" (0x09) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "full_body", Command "oparcie_w_dol" (0x06) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "full_body", Command "oparcie_w_dol" (0x06) clears Byte 4 from 0x02 to 0x00.
+[WARN] Scenario "full_body", Command "predkosc_minus" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "predkosc_plus" did not reach a reliable stable state.
+[WARN] Scenario "full_body", Command "do_przodu_do_tylu_1" did not reach a reliable stable state.
+[ACTION] Scenario "full_body", Command "plecy_i_talia" (0x17) changes Byte 4 from 0x02 to 0x0C.
+[WARN] Scenario "full_body", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[ACTION] Scenario "full_body", Command "szyja" (0x19) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "full_body", Command "szyja" (0x19) changes Byte 4 from 0x02 to 0x0E.
+
+----------------------------------------------------------------------
+[SCENARIO] auto
+----------------------------------------------------------------------
+[WARN] Scenario "auto", Command "ramiona" did not reach a reliable stable state.
+[WARN] Scenario "auto", Command "przedramiona" did not reach a reliable stable state.
+[WARN] Scenario "auto", Command "nogi" did not reach a reliable stable state.
+[ACTION] Scenario "auto", Command "sila_nacisku_plus" (0x10) changes Byte 5 from 0x0C to 0x0F.
+[ACTION] Scenario "auto", Command "sila_nacisku_minus" (0x0F) clears Byte 5 from 0x0C to 0x00.
+[NO_EFFECT] Scenario "auto", Command "masaz_posladkow" (0x0E) produced no stable frame change.
+[WARN] Scenario "auto", Command "masaz_stop" did not reach a reliable stable state.
+[NO_EFFECT] Scenario "auto", Command "predkosc_masazu_stop" (0x02) produced no stable frame change.
+[WARN] Scenario "auto", Command "pauza" did not reach a reliable stable state.
+[WARN] Scenario "auto", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Scenario "auto", Command "czas" did not reach a reliable stable state.
+[ACTION] Scenario "auto", Command "masaz_calego_ciala" (0x04) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "auto", Command "masaz_calego_ciala" (0x04) clears Byte 6 from 0x0F to 0x00.
+[ACTION] Scenario "auto", Command "grawitacja_zero" (0x08) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "auto", Command "grawitacja_zero" (0x08) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "auto", Command "grawitacja_zero" (0x08) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "auto", Command "grawitacja_zero" (0x08) clears Byte 6 from 0x0F to 0x00.
+[WARN] Scenario "auto", Command "tryb_automatyczny" did not reach a reliable stable state.
+[ACTION] Scenario "auto", Command "oparcie_w_gore" (0x09) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_gore" (0x09) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_gore" (0x09) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_gore" (0x09) clears Byte 6 from 0x0F to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_dol" (0x06) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_dol" (0x06) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_dol" (0x06) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "auto", Command "oparcie_w_dol" (0x06) clears Byte 6 from 0x0F to 0x00.
+[WARN] Scenario "auto", Command "predkosc_minus" did not reach a reliable stable state.
+[NO_EFFECT] Scenario "auto", Command "predkosc_plus" (0x15) produced no stable frame change.
+[WARN] Scenario "auto", Command "do_przodu_do_tylu_1" did not reach a reliable stable state.
+[ACTION] Scenario "auto", Command "plecy_i_talia" (0x17) changes Byte 4 from 0x02 to 0x0C.
+[ACTION] Scenario "auto", Command "plecy_i_talia" (0x17) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "auto", Command "plecy_i_talia" (0x17) clears Byte 6 from 0x0F to 0x00.
+[WARN] Scenario "auto", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[ACTION] Scenario "auto", Command "szyja" (0x19) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "auto", Command "szyja" (0x19) changes Byte 4 from 0x02 to 0x0E.
+[ACTION] Scenario "auto", Command "szyja" (0x19) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "auto", Command "szyja" (0x19) clears Byte 6 from 0x0F to 0x00.
+
+----------------------------------------------------------------------
+[SCENARIO] zero_gravity
+----------------------------------------------------------------------
+[WARN] Scenario "zero_gravity", Command "ramiona" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "przedramiona" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "nogi" did not reach a reliable stable state.
+[ACTION] Scenario "zero_gravity", Command "sila_nacisku_plus" (0x10) changes Byte 5 from 0x0C to 0x0F.
+[ACTION] Scenario "zero_gravity", Command "sila_nacisku_minus" (0x0F) clears Byte 5 from 0x0C to 0x00.
+[WARN] Scenario "zero_gravity", Command "masaz_posladkow" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "masaz_stop" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "predkosc_masazu_stop" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "pauza" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "czas" did not reach a reliable stable state.
+[ACTION] Scenario "zero_gravity", Command "masaz_calego_ciala" (0x04) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "zero_gravity", Command "masaz_calego_ciala" (0x04) clears Byte 6 from 0x0F to 0x00.
+[ACTION] Scenario "zero_gravity", Command "grawitacja_zero" (0x08) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "grawitacja_zero" (0x08) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "grawitacja_zero" (0x08) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "zero_gravity", Command "grawitacja_zero" (0x08) clears Byte 6 from 0x0F to 0x00.
+[NO_EFFECT] Scenario "zero_gravity", Command "tryb_automatyczny" (0x05) produced no stable frame change.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_gore" (0x09) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_gore" (0x09) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_gore" (0x09) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_gore" (0x09) clears Byte 6 from 0x0F to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_dol" (0x06) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_dol" (0x06) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_dol" (0x06) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "zero_gravity", Command "oparcie_w_dol" (0x06) clears Byte 6 from 0x0F to 0x00.
+[WARN] Scenario "zero_gravity", Command "predkosc_minus" did not reach a reliable stable state.
+[WARN] Scenario "zero_gravity", Command "predkosc_plus" did not reach a reliable stable state.
+[NO_EFFECT] Scenario "zero_gravity", Command "do_przodu_do_tylu_1" (0x16) produced no stable frame change.
+[ACTION] Scenario "zero_gravity", Command "plecy_i_talia" (0x17) changes Byte 4 from 0x02 to 0x0C.
+[ACTION] Scenario "zero_gravity", Command "plecy_i_talia" (0x17) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "zero_gravity", Command "plecy_i_talia" (0x17) clears Byte 6 from 0x0F to 0x00.
+[WARN] Scenario "zero_gravity", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[ACTION] Scenario "zero_gravity", Command "szyja" (0x19) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "zero_gravity", Command "szyja" (0x19) changes Byte 4 from 0x02 to 0x0E.
+[ACTION] Scenario "zero_gravity", Command "szyja" (0x19) clears Byte 5 from 0x0C to 0x00.
+[ACTION] Scenario "zero_gravity", Command "szyja" (0x19) clears Byte 6 from 0x0F to 0x00.
+
+----------------------------------------------------------------------
+[SCENARIO] back_waist
+----------------------------------------------------------------------
+[ACTION] Scenario "back_waist", Command "ramiona" (0x13) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "back_waist", Command "ramiona" (0x13) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "back_waist", Command "przedramiona" (0x12) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "back_waist", Command "przedramiona" (0x12) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "back_waist", Command "nogi" (0x11) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "back_waist", Command "nogi" (0x11) activates Byte 6 to value 0x0F.
+[NO_EFFECT] Scenario "back_waist", Command "sila_nacisku_plus" (0x10) produced no stable frame change.
+[WARN] Scenario "back_waist", Command "sila_nacisku_minus" did not reach a reliable stable state.
+[WARN] Scenario "back_waist", Command "masaz_posladkow" did not reach a reliable stable state.
+[WARN] Scenario "back_waist", Command "masaz_stop" did not reach a reliable stable state.
+[WARN] Scenario "back_waist", Command "predkosc_masazu_stop" did not reach a reliable stable state.
+[NO_EFFECT] Scenario "back_waist", Command "pauza" (0x0B) produced no stable frame change.
+[WARN] Scenario "back_waist", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Scenario "back_waist", Command "czas" did not reach a reliable stable state.
+[ACTION] Scenario "back_waist", Command "masaz_calego_ciala" (0x04) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "back_waist", Command "masaz_calego_ciala" (0x04) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "back_waist", Command "grawitacja_zero" (0x08) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "back_waist", Command "grawitacja_zero" (0x08) clears Byte 4 from 0x0C to 0x00.
+[ACTION] Scenario "back_waist", Command "tryb_automatyczny" (0x05) changes Byte 4 from 0x0C to 0x02.
+[ACTION] Scenario "back_waist", Command "tryb_automatyczny" (0x05) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "back_waist", Command "tryb_automatyczny" (0x05) activates Byte 6 to value 0x0F.
+[WARN] Scenario "back_waist", Command "oparcie_w_gore" did not reach a reliable stable state.
+[ACTION] Scenario "back_waist", Command "oparcie_w_dol" (0x06) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "back_waist", Command "oparcie_w_dol" (0x06) clears Byte 4 from 0x0C to 0x00.
+[NO_EFFECT] Scenario "back_waist", Command "predkosc_minus" (0x14) produced no stable frame change.
+[NO_EFFECT] Scenario "back_waist", Command "predkosc_plus" (0x15) produced no stable frame change.
+[WARN] Scenario "back_waist", Command "do_przodu_do_tylu_1" did not reach a reliable stable state.
+[ACTION] Scenario "back_waist", Command "plecy_i_talia" (0x17) clears Byte 3 from 0x04 to 0x00.
+[WARN] Scenario "back_waist", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[ACTION] Scenario "back_waist", Command "szyja" (0x19) changes Byte 4 from 0x0C to 0x0E.
+
+----------------------------------------------------------------------
+[SCENARIO] neck
+----------------------------------------------------------------------
+[ACTION] Scenario "neck", Command "ramiona" (0x13) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "neck", Command "ramiona" (0x13) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "neck", Command "przedramiona" (0x12) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "neck", Command "przedramiona" (0x12) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "neck", Command "nogi" (0x11) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "neck", Command "nogi" (0x11) activates Byte 6 to value 0x0F.
+[NO_EFFECT] Scenario "neck", Command "sila_nacisku_plus" (0x10) produced no stable frame change.
+[NO_EFFECT] Scenario "neck", Command "sila_nacisku_minus" (0x0F) produced no stable frame change.
+[WARN] Scenario "neck", Command "masaz_posladkow" did not reach a reliable stable state.
+[WARN] Scenario "neck", Command "masaz_stop" did not reach a reliable stable state.
+[WARN] Scenario "neck", Command "predkosc_masazu_stop" did not reach a reliable stable state.
+[WARN] Scenario "neck", Command "pauza" did not reach a reliable stable state.
+[WARN] Scenario "neck", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Scenario "neck", Command "czas" did not reach a reliable stable state.
+[ACTION] Scenario "neck", Command "masaz_calego_ciala" (0x04) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "neck", Command "masaz_calego_ciala" (0x04) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "neck", Command "grawitacja_zero" (0x08) clears Byte 4 from 0x0E to 0x00.
+[ACTION] Scenario "neck", Command "tryb_automatyczny" (0x05) activates Byte 3 to value 0x04.
+[ACTION] Scenario "neck", Command "tryb_automatyczny" (0x05) changes Byte 4 from 0x0E to 0x02.
+[ACTION] Scenario "neck", Command "tryb_automatyczny" (0x05) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "neck", Command "tryb_automatyczny" (0x05) activates Byte 6 to value 0x0F.
+[ACTION] Scenario "neck", Command "oparcie_w_gore" (0x09) clears Byte 4 from 0x0E to 0x00.
+[ACTION] Scenario "neck", Command "oparcie_w_dol" (0x06) clears Byte 4 from 0x0E to 0x00.
+[NO_EFFECT] Scenario "neck", Command "predkosc_minus" (0x14) produced no stable frame change.
+[NO_EFFECT] Scenario "neck", Command "predkosc_plus" (0x15) produced no stable frame change.
+[NO_EFFECT] Scenario "neck", Command "do_przodu_do_tylu_1" (0x16) produced no stable frame change.
+[ACTION] Scenario "neck", Command "plecy_i_talia" (0x17) activates Byte 3 to value 0x04.
+[WARN] Scenario "neck", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[ACTION] Scenario "neck", Command "szyja" (0x19) changes Byte 4 from 0x0E to 0x0C.
+
+----------------------------------------------------------------------
+[SCENARIO] full_body_plus_intensity
+----------------------------------------------------------------------
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "ramiona" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "przedramiona" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "nogi" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "sila_nacisku_plus" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "sila_nacisku_minus" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "masaz_posladkow" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "masaz_stop" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "predkosc_masazu_stop" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "pauza" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "czas" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "masaz_calego_ciala" did not reach a reliable stable state.
+[ACTION] Scenario "full_body_plus_intensity", Command "grawitacja_zero" (0x08) clears Byte 3 from 0x04 to 0x00.
+[ACTION] Scenario "full_body_plus_intensity", Command "grawitacja_zero" (0x08) clears Byte 4 from 0x02 to 0x00.
+[ACTION] Scenario "full_body_plus_intensity", Command "tryb_automatyczny" (0x05) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body_plus_intensity", Command "tryb_automatyczny" (0x05) activates Byte 6 to value 0x0F.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "oparcie_w_gore" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "oparcie_w_dol" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "predkosc_minus" did not reach a reliable stable state.
+[WARN] Scenario "full_body_plus_intensity", Command "predkosc_plus" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "do_przodu_do_tylu_1" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "plecy_i_talia" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[WARN] Seed step failed for command "sila_nacisku_plus".
+[WARN] Scenario "full_body_plus_intensity", Command "szyja" did not reach a reliable stable state.
+
+----------------------------------------------------------------------
+[SCENARIO] full_body_plus_speed
+----------------------------------------------------------------------
+[ACTION] Scenario "full_body_plus_speed", Command "ramiona" (0x13) activates Byte 5 to value 0x0C.
+[ACTION] Scenario "full_body_plus_speed", Command "ramiona" (0x13) activates Byte 6 to value 0x0F.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "przedramiona" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "nogi" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "sila_nacisku_plus" did not reach a reliable stable state.
+[WARN] Scenario "full_body_plus_speed", Command "sila_nacisku_minus" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "masaz_posladkow" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "masaz_stop" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "predkosc_masazu_stop" did not reach a reliable stable state.
+[WARN] Scenario "full_body_plus_speed", Command "pauza" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "ogrzewanie" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "czas" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "masaz_calego_ciala" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "grawitacja_zero" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "tryb_automatyczny" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "oparcie_w_gore" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "oparcie_w_dol" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "predkosc_minus" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "predkosc_plus" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "do_przodu_do_tylu_1" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "plecy_i_talia" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "do_przodu_do_tylu_2" did not reach a reliable stable state.
+[WARN] Seed step failed for command "predkosc_plus".
+[WARN] Scenario "full_body_plus_speed", Command "szyja" did not reach a reliable stable state.
+
+======================================================================
+SECTION 2 - LIMIT & STEP FINDING
+======================================================================
+----------------------------------------------------------------------
+[SCALAR] Analyzing "sila_nacisku".
+----------------------------------------------------------------------
+[WARN] Plus stepping timed out for "sila_nacisku".
+[WARN] Minus stepping timed out for "sila_nacisku".
+[LIMITS] "sila_nacisku" did not resolve to a clean byte mapping.
+----------------------------------------------------------------------
+[SCALAR] Analyzing "predkosc".
+----------------------------------------------------------------------
+[WARN] Plus stepping timed out for "predkosc".
+[WARN] Minus stepping timed out for "predkosc".
+[LIMITS] "predkosc" did not resolve to a clean byte mapping.
+
+======================================================================
+SECTION 3 - FEATURE BLOCKING / DEAD BUTTONS IN AUTO MODE
+======================================================================
+[WARN] Auto-block test did not stabilize for "ramiona".
+[WARN] Auto-block test did not stabilize for "przedramiona".
+[WARN] Auto-block test did not stabilize for "nogi".
+[AUTO_TEST] "sila_nacisku_plus" still changes the frame while auto mode is active.
+[AUTO_TEST] "sila_nacisku_minus" still changes the frame while auto mode is active.
+[WARN] Auto-block test did not stabilize for "masaz_posladkow".
+[WARN] Auto-block test did not stabilize for "masaz_stop".
+[WARN] Auto-block test did not stabilize for "predkosc_masazu_stop".
+[AUTO_TEST] "pauza" is ignored while auto mode is active.
+[WARN] Auto-block test did not stabilize for "ogrzewanie".
+[WARN] Auto-block test did not stabilize for "czas".
+[AUTO_TEST] "masaz_calego_ciala" still changes the frame while auto mode is active.
+[AUTO_TEST] "grawitacja_zero" still changes the frame while auto mode is active.
+[AUTO_TEST] "oparcie_w_gore" still changes the frame while auto mode is active.
+[AUTO_TEST] "oparcie_w_dol" still changes the frame while auto mode is active.
+[WARN] Auto-block test did not stabilize for "predkosc_minus".
+[WARN] Auto-block test did not stabilize for "predkosc_plus".
+[WARN] Auto-block test did not stabilize for "do_przodu_do_tylu_1".
+[AUTO_TEST] "plecy_i_talia" still changes the frame while auto mode is active.
+[AUTO_TEST] "do_przodu_do_tylu_2" is ignored while auto mode is active.
+[AUTO_TEST] "szyja" still changes the frame while auto mode is active.
+[BLOCKED] When "tryb_automatyczny" is active (Byte 3=0x04, Byte 4=0x02, Byte 5=0x0C, Byte 6=0x0F), the following buttons are DEAD / ignored: pauza, do_przodu_do_tylu_2.
+
+======================================================================
+SECTION 4 - OVERRIDES, EXCLUSIVITY, AND BITMASK CHECKS
+======================================================================
+[WARN] Could not stabilize second command "przedramiona" in pairwise analysis.
+[WARN] Could not stabilize second command "nogi" in pairwise analysis.
+[WARN] Could not stabilize second command "masaz_posladkow" in pairwise analysis.
+[WARN] Could not stabilize second command "masaz_calego_ciala" in pairwise analysis.
+[OVERRIDE] After "ramiona", pressing "plecy_i_talia" produces the same relevant bytes as clean "plecy_i_talia". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "ramiona", pressing "szyja" produces the same relevant bytes as clean "szyja". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[WARN] Could not stabilize second command "ramiona" in pairwise analysis.
+[WARN] Could not stabilize second command "nogi" in pairwise analysis.
+[WARN] Could not stabilize second command "masaz_posladkow" in pairwise analysis.
+[WARN] Could not stabilize second command "masaz_calego_ciala" in pairwise analysis.
+[OVERRIDE] After "przedramiona", pressing "plecy_i_talia" produces the same relevant bytes as clean "plecy_i_talia". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "przedramiona", pressing "szyja" produces the same relevant bytes as clean "szyja". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[WARN] Could not stabilize second command "ramiona" in pairwise analysis.
+[WARN] Could not stabilize second command "przedramiona" in pairwise analysis.
+[WARN] Could not stabilize second command "masaz_posladkow" in pairwise analysis.
+[WARN] Could not stabilize second command "masaz_calego_ciala" in pairwise analysis.
+[OVERRIDE] After "nogi", pressing "plecy_i_talia" produces the same relevant bytes as clean "plecy_i_talia". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "nogi", pressing "szyja" produces the same relevant bytes as clean "szyja". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[WARN] Could not stabilize second command "ramiona" in pairwise analysis.
+[WARN] Could not stabilize second command "przedramiona" in pairwise analysis.
+[WARN] Could not stabilize second command "nogi" in pairwise analysis.
+[OVERRIDE] After "masaz_posladkow", pressing "masaz_calego_ciala" produces the same relevant bytes as clean "masaz_calego_ciala". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "masaz_posladkow", pressing "plecy_i_talia" produces the same relevant bytes as clean "plecy_i_talia". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "masaz_posladkow", pressing "szyja" produces the same relevant bytes as clean "szyja". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "masaz_calego_ciala", pressing "ramiona" produces the same relevant bytes as clean "ramiona". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "masaz_calego_ciala", pressing "przedramiona" produces the same relevant bytes as clean "przedramiona". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[OVERRIDE] After "masaz_calego_ciala", pressing "nogi" produces the same relevant bytes as clean "nogi". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4, Byte 5, Byte 6.
+[WARN] Could not stabilize second command "masaz_posladkow" in pairwise analysis.
+[OVERRIDE] After "masaz_calego_ciala", pressing "plecy_i_talia" produces the same relevant bytes as clean "plecy_i_talia". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4.
+[OVERRIDE] After "masaz_calego_ciala", pressing "szyja" produces the same relevant bytes as clean "szyja". This suggests mutual exclusivity / overwrite behavior on Byte 3, Byte 4.
+[INTERACTION] "plecy_i_talia" followed by "ramiona" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4, Byte 5, Byte 6.
+[INTERACTION] "plecy_i_talia" followed by "przedramiona" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4, Byte 5, Byte 6.
+[INTERACTION] "plecy_i_talia" followed by "nogi" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4, Byte 5, Byte 6.
+[WARN] Could not stabilize second command "masaz_posladkow" in pairwise analysis.
+[INTERACTION] "plecy_i_talia" followed by "masaz_calego_ciala" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4.
+[BITMASK] "plecy_i_talia" followed by "szyja" appears to combine states by OR-style accumulation on Byte 3, Byte 4.
+[INTERACTION] "szyja" followed by "ramiona" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4, Byte 5, Byte 6.
+[INTERACTION] "szyja" followed by "przedramiona" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4, Byte 5, Byte 6.
+[INTERACTION] "szyja" followed by "nogi" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4, Byte 5, Byte 6.
+[WARN] Could not stabilize second command "masaz_posladkow" in pairwise analysis.
+[INTERACTION] "szyja" followed by "masaz_calego_ciala" produced a mixed state that is neither a pure override nor a simple OR-bitmask on Byte 3, Byte 4.
+[BITMASK] "szyja" followed by "plecy_i_talia" appears to combine states by OR-style accumulation on Byte 3, Byte 4.
+
+======================================================================
+END OF FINAL PROTOCOL DOCUMENTATION
+======================================================================
+ALL_DONE
